@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌱 สวนลุงนะ Smart Farm - Admin V5</title>
+    <title>🌱 สวนลุงนะ Smart Farm - Admin V6</title>
     <meta name="theme-color" content="#10b981">
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -124,13 +124,19 @@
         .status-box .value { font-size: 24px; font-weight: 700; color: var(--primary); }
 
         /* CHARTS */
-        .chart-container { position: relative; height: 300px; margin-bottom: 20px; }
+        .chart-container { position: relative; height: 350px; margin-bottom: 20px; }
 
-        /* SCHEDULE */
-        .schedule-item {
-            background: var(--surface-light); padding: 16px; border-radius: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;
+        /* LOG */
+        .log-container {
+            background: var(--surface-light); border-radius: 16px; padding: 16px; max-height: 300px; overflow-y: auto;
         }
-        body.dark-mode .schedule-item { background: var(--surface-dark); }
+        body.dark-mode .log-container { background: var(--surface-dark); }
+        .log-item {
+            padding: 12px; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 13px;
+        }
+        body.dark-mode .log-item { border-color: rgba(255,255,255,0.05); }
+        .log-time { color: var(--primary); font-weight: 700; }
+        .log-message { opacity: 0.8; }
 
         /* ADMIN */
         .user-list { list-style: none; }
@@ -155,7 +161,7 @@
         <div style="text-align: center;">
             <img src="suanlungna_icon_512.png" alt="Smart Farm Logo">
             <h1>สวนลุงนะ</h1>
-            <p>Smart Farm Admin V5</p>
+            <p>Smart Farm Admin V6</p>
             <div class="spinner"></div>
         </div>
     </div>
@@ -232,22 +238,6 @@
                 </div>
             </div>
 
-            <!-- TEMPERATURE CHART -->
-            <div class="card">
-                <div class="section-title"><i class="fas fa-chart-line"></i> กราฟอุณหภูมิ</div>
-                <div class="chart-container">
-                    <canvas id="tempChart"></canvas>
-                </div>
-            </div>
-
-            <!-- HUMIDITY CHART -->
-            <div class="card">
-                <div class="section-title"><i class="fas fa-chart-bar"></i> กราฟความชื้น</div>
-                <div class="chart-container">
-                    <canvas id="humChart"></canvas>
-                </div>
-            </div>
-
             <!-- PUMP CONTROL -->
             <div class="card">
                 <div class="section-title"><i class="fas fa-water"></i> ควบคุมปั๊มน้ำ</div>
@@ -263,6 +253,30 @@
                 <div class="section-title"><i class="fas fa-calendar-alt"></i> ตารางเวลา</div>
                 <div id="scheduleList"></div>
                 <button class="btn btn-primary" onclick="showScheduleEditor()"><i class="fas fa-plus"></i> เพิ่มตารางเวลา</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS PAGE -->
+    <div id="charts" class="page">
+        <div style="padding: 60px 20px 20px;">
+            <h1 style="font-size: 28px; font-weight: 700;">กราฟข้อมูล</h1>
+        </div>
+        <div class="container">
+            <!-- TEMPERATURE CHART -->
+            <div class="card">
+                <div class="section-title"><i class="fas fa-chart-line"></i> กราฟอุณหภูมิ</div>
+                <div class="chart-container">
+                    <canvas id="tempChart"></canvas>
+                </div>
+            </div>
+
+            <!-- HUMIDITY CHART -->
+            <div class="card">
+                <div class="section-title"><i class="fas fa-chart-bar"></i> กราฟความชื้น</div>
+                <div class="chart-container">
+                    <canvas id="humChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -309,6 +323,17 @@
                     <i class="fas fa-sign-out-alt"></i>
                 </div>
             </div>
+
+            <!-- ACTIVITY LOG -->
+            <div class="card">
+                <div class="section-title"><i class="fas fa-history"></i> บันทึกการทำงาน</div>
+                <div class="log-container" id="logContainer">
+                    <div class="log-item">
+                        <span class="log-time">--:--:--</span> - <span class="log-message">ระบบพร้อมใช้งาน</span>
+                    </div>
+                </div>
+                <button class="btn btn-outline" onclick="clearLogs()" style="margin-top: 12px;"><i class="fas fa-trash"></i> ล้างบันทึก</button>
+            </div>
         </div>
     </div>
 
@@ -317,6 +342,10 @@
         <div class="nav-item active" onclick="showPage('home')">
             <i class="nav-icon fas fa-home"></i>
             <span class="nav-label">หน้าแรก</span>
+        </div>
+        <div class="nav-item" onclick="showPage('charts')">
+            <i class="nav-icon fas fa-chart-line"></i>
+            <span class="nav-label">กราฟ</span>
         </div>
         <div class="nav-item" onclick="showPage('admin')">
             <i class="nav-icon fas fa-user-shield"></i>
@@ -339,6 +368,59 @@
         let humData = [];
         let tempChart = null;
         let humChart = null;
+        let activityLog = JSON.parse(localStorage.getItem('smartfarm_logs')) || [];
+
+        // ==================== LOGGING ====================
+        function addLog(message) {
+            const now = new Date();
+            const time = now.toLocaleTimeString('th-TH');
+            activityLog.push({ time, message });
+            if (activityLog.length > 50) activityLog.shift();
+            localStorage.setItem('smartfarm_logs', JSON.stringify(activityLog));
+            renderLogs();
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('logContainer');
+            container.innerHTML = activityLog.map(log => `
+                <div class="log-item">
+                    <span class="log-time">${log.time}</span> - <span class="log-message">${log.message}</span>
+                </div>
+            `).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearLogs() {
+            if (confirm('ยืนยันการล้างบันทึก?')) {
+                activityLog = [];
+                localStorage.removeItem('smartfarm_logs');
+                renderLogs();
+                showToast('ล้างบันทึกสำเร็จ');
+            }
+        }
+
+        // ==================== GREETING ====================
+        function updateGreeting() {
+            const hour = new Date().getHours();
+            let greeting = '';
+            let emoji = '';
+            
+            if (hour >= 5 && hour < 12) {
+                greeting = 'สวัสดีตอนเช้า';
+                emoji = '🌅';
+            } else if (hour >= 12 && hour < 17) {
+                greeting = 'สวัสดีตอนบ่าย';
+                emoji = '☀️';
+            } else if (hour >= 17 && hour < 21) {
+                greeting = 'สวัสดีตอนเย็น';
+                emoji = '🌆';
+            } else {
+                greeting = 'สวัสดีตอนกลางคืน';
+                emoji = '🌙';
+            }
+            
+            document.getElementById('greetingText').textContent = `${greeting} ${emoji}`;
+        }
 
         // ==================== AUTHENTICATION ====================
         function handleLogin() {
@@ -350,15 +432,19 @@
                 currentUser = user;
                 localStorage.setItem('smartfarm_currentUser', JSON.stringify(user));
                 document.getElementById('loginPage').style.display = 'none';
+                addLog(`ผู้ใช้ ${email} เข้าสู่ระบบ`);
                 initMQTT();
                 showPage('home');
+                updateGreeting();
                 showToast('เข้าสู่ระบบสำเร็จ');
             } else {
+                addLog(`พยายามเข้าสู่ระบบด้วย ${email} ล้มเหลว`);
                 showToast('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
             }
         }
 
         function logout() {
+            addLog(`ผู้ใช้ ${currentUser.email} ออกจากระบบ`);
             currentUser = null;
             localStorage.removeItem('smartfarm_currentUser');
             if (mqttClient) mqttClient.end();
@@ -378,6 +464,7 @@
         function toggleDarkMode() {
             document.body.classList.toggle('dark-mode');
             localStorage.setItem('smartfarm_darkMode', document.body.classList.contains('dark-mode'));
+            addLog(document.body.classList.contains('dark-mode') ? 'เปิดโหมดมืด' : 'ปิดโหมดมืด');
         }
 
         // ==================== MQTT CONNECTION ====================
@@ -395,8 +482,8 @@
                 console.log('MQTT Connected');
                 document.getElementById('nodeStatus').textContent = 'ONLINE';
                 document.getElementById('nodeStatus').style.color = '#10b981';
+                addLog('เชื่อมต่อ MQTT สำเร็จ');
                 
-                // Subscribe to topics
                 mqttClient.subscribe(['farm/pump/status', 'farm/time', 'farm/soil', 'farm/light', 'farm/status', 'farm/mode', 'farm/temp', 'farm/hum']);
             });
 
@@ -408,6 +495,7 @@
                     case 'farm/pump/status':
                         document.getElementById('pumpStatus').textContent = msg === 'ON' ? 'ON' : 'OFF';
                         document.getElementById('pumpStatus').style.color = msg === 'ON' ? '#ef4444' : '#10b981';
+                        addLog(`ปั๊มน้ำ: ${msg}`);
                         break;
                     case 'farm/time':
                         document.getElementById('rtcTime').textContent = msg;
@@ -420,6 +508,7 @@
                         break;
                     case 'farm/mode':
                         document.getElementById('modeStatus').textContent = msg;
+                        addLog(`โหมด: ${msg}`);
                         break;
                     case 'farm/temp':
                         document.getElementById('temp').textContent = msg + '°C';
@@ -440,6 +529,7 @@
                 console.error('MQTT Error:', err);
                 document.getElementById('nodeStatus').textContent = 'OFFLINE';
                 document.getElementById('nodeStatus').style.color = '#ef4444';
+                addLog('ข้อผิดพลาด MQTT: ' + err.message);
             });
         }
 
@@ -449,14 +539,20 @@
                 const currentStatus = document.getElementById('pumpStatus').textContent;
                 const newStatus = currentStatus === 'ON' ? 'OFF' : 'ON';
                 mqttClient.publish('farm/pump', newStatus);
+                addLog(`สั่งปั๊มน้ำ: ${newStatus}`);
                 showToast(`ปั๊มน้ำ: ${newStatus}`);
+            } else {
+                showToast('ไม่ได้เชื่อมต่อ MQTT');
             }
         }
 
         function setPumpMode(mode) {
             if (mqttClient && mqttClient.connected) {
                 mqttClient.publish('farm/mode', mode);
+                addLog(`เปลี่ยนโหมด: ${mode}`);
                 showToast(`โหมด: ${mode}`);
+            } else {
+                showToast('ไม่ได้เชื่อมต่อ MQTT');
             }
         }
 
@@ -514,6 +610,7 @@
             const time = prompt('ใส่เวลา (HH:MM):');
             if (time && mqttClient && mqttClient.connected) {
                 mqttClient.publish('farm/schedule', time);
+                addLog(`ตั้งตารางเวลา: ${time}`);
                 showToast('บันทึกตารางเวลา: ' + time);
             }
         }
@@ -530,6 +627,7 @@
                 document.getElementById('newEmail').value = '';
                 document.getElementById('newPass').value = '';
                 renderUserList();
+                addLog(`เพิ่มผู้ใช้: ${email} (${role})`);
                 showToast('เพิ่มผู้ใช้สำเร็จ');
             }
         }
@@ -539,6 +637,7 @@
                 users = users.filter(u => u.email !== email);
                 localStorage.setItem('smartfarm_users', JSON.stringify(users));
                 renderUserList();
+                addLog(`ลบผู้ใช้: ${email}`);
                 showToast('ลบผู้ใช้สำเร็จ');
             }
         }
@@ -572,6 +671,7 @@
                 currentUser = JSON.parse(savedUser);
                 document.getElementById('loginPage').style.display = 'none';
                 initMQTT();
+                updateGreeting();
             }
             
             if (localStorage.getItem('smartfarm_darkMode') === 'true') {
@@ -579,7 +679,12 @@
             }
             
             renderUserList();
+            renderLogs();
+            addLog('ระบบเริ่มต้นสำเร็จ');
         });
+
+        // Update greeting every minute
+        setInterval(updateGreeting, 60000);
     </script>
 </body>
 </html>
