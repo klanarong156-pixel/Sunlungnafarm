@@ -131,11 +131,39 @@
 <body>
 
     <!-- ============================================
+         SPLASH SCREEN (Loading)
+         ============================================ -->
+    <div id="splashScreen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999; background: linear-gradient(135deg, #10b981, #059669); display: flex; flex-direction: column; align-items: center; justify-content: center; animation: fadeOutSplash 0.6s ease-in-out 2.4s forwards;">
+        <div style="text-align: center;">
+            <img src="suanlungna_icon_512.png" alt="Smart Farm Logo" style="width: 120px; height: 120px; border-radius: 32px; margin-bottom: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); animation: bounceIn 0.8s ease-out;">
+            <h1 style="font-size: 28px; font-weight: 700; color: white; margin-bottom: 8px; font-family: 'Kanit', sans-serif;">สวนลุงนะ</h1>
+            <p style="font-size: 14px; color: rgba(255,255,255,0.8); font-family: 'Kanit', sans-serif; margin-bottom: 32px;">Smart Farm Admin V4</p>
+            <div style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes fadeOutSplash {
+            0% { opacity: 1; visibility: visible; }
+            100% { opacity: 0; visibility: hidden; }
+        }
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { opacity: 1; }
+            70% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
+    <!-- ============================================
          LOGIN PAGE
          ============================================ -->
     <div id="loginPage">
         <div class="login-card">
-            <span class="login-logo">🌱</span>
+            <img src="suanlungna_icon_180.png" alt="Smart Farm Logo" style="width: 80px; height: 80px; border-radius: 20px; margin: 0 auto 20px; display: block; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
             <h1 class="login-title">สวนลุงนะ Smart Farm</h1>
             <p class="login-subtitle">กรุณาเข้าสู่ระบบเพื่อจัดการฟาร์มของคุณ</p>
             <input type="email" id="loginEmail" class="input-control" placeholder="อีเมล">
@@ -151,9 +179,12 @@
     <div id="home" class="page">
         <div class="header">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <p id="greetingText">สวัสดีคุณแอดมิน ☀️</p>
-                    <h2 id="farmName">สวนลุงนะ Smart Farm</h2>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <img src="suanlungna_icon_180.png" alt="Logo" style="width: 50px; height: 50px; border-radius: 12px;">
+                    <div>
+                        <p id="greetingText" style="font-size: 12px; opacity: 0.9;">\u0e2a\u0e27\u0e31\u0e2a\u0e14\u0e35\u0e04\u0e38\u0e13\u0e41\u0e2d\u0e14\u0e21\u0e34\u0e19</p>
+                        <h2 id="farmName" style="font-size: 18px; margin: 0;">\u0e2a\u0e27\u0e19\u0e25\u0e38\u0e07\u0e19\u0e30 Smart Farm</h2>
+                    </div>
                 </div>
                 <div style="text-align: right;">
                     <div id="nodeStatus" style="padding: 6px 12px; border-radius: 20px; background: rgba(255,255,255,0.2); font-size: 12px; font-weight: 600;">OFFLINE</div>
