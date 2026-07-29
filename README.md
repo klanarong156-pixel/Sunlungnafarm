@@ -1,56 +1,122 @@
-# Smart Farm ESP8266 (Refactored)
+# Smart Farm ESP8266 NodeMCU V3
 
-โปรเจกต์นี้เป็นการพัฒนาโค้ดระบบ Smart Farm ที่ใช้ ESP8266 (NodeMCU V3) เพื่อควบคุมปั๊มน้ำผ่านรีเลย์ โดยเชื่อมต่อกับ MQTT (HiveMQ Cloud) และมีระบบตั้งเวลารดน้ำอัตโนมัติด้วย RTC DS3231 โค้ดได้รับการปรับปรุงให้มีประสิทธิภาพสูงขึ้น มีความเสถียร และรองรับการทำงานแบบมืออาชีพตามเงื่อนไขที่กำหนด
+Production-grade Smart Farm firmware for ESP8266 NodeMCU V3 using a clean, modular architecture. The project controls a four-channel active-LOW relay board, serves a mobile-first Bootstrap dashboard from LittleFS, supports WiFi STA with captive AP fallback, uses lightweight WebSocket telemetry, and persists users/settings/schedules across reboots.
 
-## การแก้ไขและพัฒนาตามเงื่อนไข 20 ข้อ
+## Hardware mapping
 
-1. **วิเคราะห์โค้ดทั้งหมด**: ตรวจสอบและทำความเข้าใจการทำงานของโค้ดเดิมทั้งหมด
-2. **แก้ Bug ที่พบ**: 
-   - แก้ไขการประกาศตัวแปร String ที่ใช้เครื่องหมายคำพูดผิดรูปแบบ (`“` แทนที่จะเป็น `"`)
-   - แก้ไขการใช้ `sprintf` ให้ปลอดภัยขึ้น
-   - แก้ไขตรรกะการเช็คเวลาที่อาจทำให้ปั๊มเปิด/ปิดซ้ำๆ ใน 1 นาที
-3. **ปรับโครงสร้างโค้ดให้เป็นมืออาชีพ**: จัดกลุ่มตัวแปร, ค่าคงที่, และฟังก์ชันต่างๆ ให้เป็นระเบียบและอ่านง่าย
-4. **แยก Function ให้เป็นระเบียบ**: แยกฟังก์ชันการทำงานเฉพาะเจาะจง เช่น `loadScheduleFromEEPROM`, `setPump`, `connectMQTT`, `checkSchedule`
-5. **เพิ่ม Comment ภาษาไทย**: อธิบายการทำงานของแต่ละส่วนอย่างชัดเจน
-6. **เพิ่มระบบ Watchdog**: เปิดใช้งาน Hardware Watchdog Timer (`ESP.wdtEnable(WDTO_8S)`) เพื่อรีเซ็ตบอร์ดอัตโนมัติหากระบบค้างเกิน 8 วินาที
-7. **เพิ่มระบบ Auto Reconnect WiFi**: WiFiManager มีระบบนี้ในตัว และเพิ่มการตรวจสอบสถานะ WiFi ใน `loop()` เพื่อป้องกันระบบค้างตอนหลุด
-8. **เพิ่มระบบ Auto Reconnect MQTT**: ใช้การตรวจสอบเวลาแบบ Non-blocking ในการพยายามเชื่อมต่อใหม่ทุก 5 วินาที
-9. **เพิ่มระบบ Heartbeat ทุก 30 วินาที**: ส่งข้อความ "ONLINE" ไปยัง topic `farm/status` ทุก 30 วินาที เพื่อยืนยันว่าบอร์ดยังทำงานอยู่
-10. **เพิ่มระบบ Log ผ่าน Serial**: แสดงสถานะการทำงานต่างๆ ผ่าน Serial Monitor อย่างละเอียด
-11. **ป้องกันการเปิดปั๊มซ้ำ**: เพิ่มตัวแปร `pumpState` และตรวจสอบสถานะปัจจุบันก่อนสั่งงานรีเลย์เสมอ
-12. **ทำให้โค้ดไม่ใช้ delay()**: ถอด `delay()` ออกทั้งหมด เปลี่ยนมาใช้การเปรียบเทียบเวลาแทน
-13. **ใช้ millis() ทั้งหมด**: ใช้ `millis()` ในการจัดการเวลาหน่วงของระบบทั้งหมด (Heartbeat, MQTT Reconnect, RTC Update)
-14. **เพิ่มระบบ Manual/Auto Mode**: เพิ่มตัวแปร `isAutoMode` เพื่อให้สามารถเลือกควบคุมเองหรือให้ระบบทำตามตารางเวลาได้
-15. **เพิ่ม MQTT Topic**:
-    - `farm/pump`: รับคำสั่งเปิด/ปิดปั๊ม (เฉพาะตอน Manual Mode)
-    - `farm/status`: ส่งสถานะปั๊ม (ON/OFF) และ Heartbeat (ONLINE)
-    - `farm/time`: ส่งเวลาปัจจุบันจาก RTC ทุก 1 วินาที
-    - `farm/mode`: รับคำสั่งและส่งสถานะโหมด (AUTO/MANUAL)
-    - `farm/schedule`: รับตารางเวลาจาก MQTT
-16. **เพิ่มระบบรับเวลารดน้ำจาก MQTT**: สามารถส่งเวลามาตั้งค่าได้ผ่าน topic `farm/schedule` (รูปแบบ: HH:MM,HH:MM,HH:MM,HH:MM)
-17. **เพิ่มระบบเก็บค่า Schedule ใน EEPROM**: บันทึกตารางเวลาลง EEPROM อัตโนมัติเมื่อมีการตั้งค่าใหม่ และโหลดกลับมาตอนบูตเครื่อง
-18. **รองรับการรีบูตโดยข้อมูลไม่หาย**: ด้วยการใช้ EEPROM ทำให้ตารางเวลาที่ตั้งไว้ยังคงอยู่แม้ไฟดับ
-19. **เพิ่มระบบแจ้ง Offline หาก ESP หลุด**: ใช้ฟีเจอร์ LWT (Last Will and Testament) ของ MQTT โดยกำหนดให้ส่งข้อความ "OFFLINE" ไปยัง `farm/status` หากบอร์ดขาดการเชื่อมต่อ
-20. **อธิบายทุกส่วนของโค้ดที่แก้ไข**: อธิบายรายละเอียดทั้งหมดไว้ในเอกสารนี้และใน Comment ของโค้ด
+| Relay | Function | GPIO | NodeMCU pin | Boot safety |
+| --- | --- | --- | --- | --- |
+| 1 | Pump | GPIO5 | D1 | Safe |
+| 2 | Zone 1 | GPIO4 | D2 | Safe |
+| 3 | Sala Light | GPIO14 | D5 | Safe |
+| 4 | Side Light | GPIO12 | D6 | Safe |
 
-## โครงสร้าง Topic MQTT ที่ใช้งาน
+The firmware intentionally avoids D3/GPIO0, D4/GPIO2, and D8/GPIO15 for relay drive so relay hardware cannot break ESP8266 boot mode.
 
-| Topic | ทิศทาง | รายละเอียด |
-|-------|--------|------------|
-| `farm/pump` | Subscribe | รับคำสั่ง `ON` หรือ `OFF` เพื่อเปิด/ปิดปั๊ม (เฉพาะตอน Manual Mode) |
-| `farm/status` | Publish | ส่งสถานะปั๊ม (`ON`/`OFF`) เมื่อมีการเปลี่ยนแปลง และส่ง `ONLINE` ทุก 30 วินาที (Heartbeat) และ `OFFLINE` เมื่อหลุดการเชื่อมต่อ (LWT) |
-| `farm/time` | Publish | ส่งเวลาปัจจุบันจาก RTC ในรูปแบบ `HH:MM:SS` ทุก 1 วินาที |
-| `farm/mode` | Sub/Pub | รับคำสั่งและส่งสถานะโหมดการทำงาน (`AUTO` หรือ `MANUAL`) |
-| `farm/schedule` | Subscribe | รับตารางเวลาใหม่ในรูปแบบ `HH:MM,HH:MM,HH:MM,HH:MM` (เวลาเปิด1,เวลาปิด1,เวลาเปิด2,เวลาปิด2) |
+## Features
 
-## วิธีการใช้งาน
+- WiFi STA mode with `SmartFarm_Setup` AP fallback and mDNS at `smartfarm.local`.
+- Real-time dashboard: IP, RSSI, uptime, free heap, mode, and relay states.
+- Manual relay control with session auth and CSRF headers.
+- Emergency stop for privileged users.
+- Safety interlock: pump can turn on only when Zone 1 is on; if all zones are off the pump is forced off.
+- millis()-based scheduler with day masks, start minute, duration, and LittleFS persistence.
+- User login with SHA256 password hash, session timeout, and route-level roles.
+- Web OTA endpoint built on `Updater` with post-success reboot.
+- Event/error logs stored in LittleFS and downloadable through authenticated endpoints.
+- ESP8266 performance rules: no `delay()`, small JSON buffers, `F()` macro logging strings, and no RTOS.
 
-1. เปิดไฟล์ `Smartfarm_Refactored.ino` ด้วย Arduino IDE
-2. ติดตั้งไลบรารีที่จำเป็น (หากยังไม่มี):
-   - WiFiManager
-   - PubSubClient
-   - RTClib
-3. อัปโหลดโค้ดลงบอร์ด NodeMCU V3
-4. เมื่อบอร์ดทำงานครั้งแรก ให้เชื่อมต่อ WiFi ชื่อ `SmartFarm_Setup` เพื่อตั้งค่าเครือข่าย
-5. ระบบจะเริ่มทำงานตามตารางเวลาที่ตั้งไว้ (ค่าเริ่มต้นคือ 06:00-06:10 และ 17:00-17:10)
-6. สามารถควบคุมผ่าน MQTT Dashboard ได้ตาม Topic ที่กำหนด
+## Project structure
+
+```text
+/src
+  main.cpp
+  config.h
+  relay.cpp / relay.h
+  scheduler.cpp / scheduler.h
+  wifi.cpp / wifi.h
+  webserver.cpp / webserver.h
+  websocket.cpp / websocket.h
+  auth.cpp / auth.h
+  storage.cpp / storage.h
+  ota.cpp / ota.h
+  logger.cpp / logger.h
+/data
+  index.html
+  login.html
+  dashboard.html
+  settings.html
+  schedule.html
+  users.html
+  logs.html
+  style.css
+  script.js
+platformio.ini
+```
+
+## Library dependencies
+
+PlatformIO installs these automatically from `platformio.ini`:
+
+- ArduinoJson 7
+- WiFiManager 2
+- arduinoWebSockets
+
+The ESP8266 Arduino core provides ESP8266WiFi, ESP8266WebServer, LittleFS, ESP8266mDNS, ArduinoOTA, Updater, Hash, and EEPROM fallback support.
+
+## Build instructions
+
+```bash
+pio run
+```
+
+For Arduino IDE, install ESP8266 board support and the dependencies above, then place the files in an Arduino sketch folder preserving the `src` and `data` layout.
+
+## Flash instructions
+
+```bash
+pio run -t upload
+pio run -t uploadfs
+pio device monitor -b 115200
+```
+
+After first boot, connect to AP `SmartFarm_Setup` if no saved WiFi is available, configure WiFi, then open `http://smartfarm.local/` or the displayed IP address.
+
+## Default login
+
+- Username: `admin`
+- Password: `admin123`
+
+Change the default user immediately before production deployment by updating `/users.json` through your provisioning workflow.
+
+## Usage guide
+
+1. Log in from `/`.
+2. Open `/dashboard.html`.
+3. Turn Zone 1 on before turning Pump on.
+4. Use Emergency Stop to immediately force all relays off.
+5. Enable Auto mode through `/api/mode` once schedules have been provisioned in `/schedule.json`.
+6. Download `/logs/event` for event logs.
+
+## Extending relay channels
+
+1. Increase `RELAY_COUNT` in `src/config.h`.
+2. Add a boot-safe GPIO to `RELAY_PINS` and a label to `RELAY_NAMES`.
+3. Expand `RelayController::states_` in `src/relay.h`.
+4. Update dashboard labels in `data/script.js`.
+5. Review `anyZoneOn()` if additional irrigation zones should permit pump operation.
+
+## Verification checklist
+
+- Compile with `pio run` and verify no warnings.
+- Upload LittleFS with `pio run -t uploadfs`.
+- Confirm ESP boots with all relays off.
+- Confirm D3, D4, and D8 are not connected to relay inputs.
+- Confirm WiFi portal appears when credentials are absent.
+- Confirm mDNS resolves `smartfarm.local` on the LAN.
+- Confirm all control APIs reject missing session/CSRF headers.
+- Confirm Pump ON fails while Zone 1 is OFF.
+- Confirm Pump turns OFF automatically when Zone 1 turns OFF.
+- Confirm Emergency Stop turns all relays OFF.
+- Confirm schedules still exist after reboot.
+- Confirm OTA upload succeeds and the board reboots.
