@@ -12,3 +12,7 @@ static const uint16_t HTTP_PORT = 80;
 static const uint16_t WS_PORT = 81;
 static const uint32_t WS_PUSH_MS = 1000;
 static const uint32_t SCHEDULER_TICK_MS = 1000;
+static const long TZ_OFFSET_SEC = 0;
+static const int DST_OFFSET_SEC = 0;
+static const char NTP_SERVER_1[] = "pool.ntp.org";
+static const char NTP_SERVER_2[] = "time.nist.gov";
