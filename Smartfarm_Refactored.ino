@@ -381,6 +381,16 @@ void webStatus() {
   webServer.send(200, "application/json", out);
 }
 
+void resetRelayRuntime(uint8_t relayIndex, const char *lastAction) {
+  if (relayIndex >= RELAY_COUNT) return;
+  relays[relayIndex].state = false;
+  relays[relayIndex].autoRunning = false;
+  relays[relayIndex].autoScheduleId = 0;
+  relays[relayIndex].autoStartedMs = 0;
+  relays[relayIndex].lastChangeMs = 0;
+  safeCopy(relays[relayIndex].lastAction, sizeof(relays[relayIndex].lastAction), lastAction);
+}
+
 void setupWeb() {
   webServer.on("/api/status", HTTP_GET, webStatus);
   webServer.on("/api/relay", HTTP_POST, []() {
@@ -401,12 +411,7 @@ void setup() {
   for (uint8_t i = 0; i < RELAY_COUNT; i++) {
     pinMode(RELAY_PINS[i], OUTPUT);
     digitalWrite(RELAY_PINS[i], RELAY_ACTIVE_LOW ? HIGH : LOW);
-    relays[i].state = false;
-    relays[i].autoRunning = false;
-    relays[i].autoScheduleId = 0;
-    relays[i].autoStartedMs = 0;
-    relays[i].lastChangeMs = 0;
-    safeCopy(relays[i].lastAction, sizeof(relays[i].lastAction), "boot safe off");
+    resetRelayRuntime(i, "boot safe off");
   }
   pinMode(WATER_LEVEL_PIN, INPUT_PULLUP);
   pinMode(RAIN_PIN, INPUT_PULLUP);
