@@ -95,7 +95,7 @@ struct ScheduleItem {
 const uint8_t MAX_SCHEDULES = 24;  // ESP8266-safe cap; JSON schema supports growing this value.
 Settings settings;
 RelayRuntime relays[RELAY_COUNT];
-ScheduleItem schedules[MAX_SCHEDULES];
+ScheduleItem scheduleList[MAX_SCHEDULES];
 uint8_t scheduleCount = 0;
 bool rtcOk = false;
 bool mqttWasConnected = false;
@@ -247,7 +247,7 @@ void loadSchedules() {
   JsonArray arr = doc["schedules"].as<JsonArray>();
   for (JsonObject o : arr) {
     if (scheduleCount >= MAX_SCHEDULES) break;
-    ScheduleItem &s = schedules[scheduleCount++];
+    ScheduleItem &s = scheduleList[scheduleCount++];
     s.id = o["id"] | (1000 + scheduleCount);
     s.enabled = o["enabled"] | true;
     s.relay = constrain((int)(o["relay"] | 1), 1, 4) - 1;
@@ -268,10 +268,10 @@ void publishSchedules() {
   JsonArray arr = doc.createNestedArray("schedules");
   for (uint8_t i = 0; i < scheduleCount; i++) {
     JsonObject o = arr.createNestedObject();
-    o["id"] = schedules[i].id; o["enabled"] = schedules[i].enabled; o["relay"] = schedules[i].relay + 1;
-    o["name"] = schedules[i].name; o["onTime"] = schedules[i].onTime; o["offTime"] = schedules[i].offTime;
-    o["durationMin"] = schedules[i].durationMin; o["daysMask"] = schedules[i].daysMask; o["repeat"] = schedules[i].repeat;
-    o["autoExecution"] = schedules[i].autoExecution;
+    o["id"] = scheduleList[i].id; o["enabled"] = scheduleList[i].enabled; o["relay"] = scheduleList[i].relay + 1;
+    o["name"] = scheduleList[i].name; o["onTime"] = scheduleList[i].onTime; o["offTime"] = scheduleList[i].offTime;
+    o["durationMin"] = scheduleList[i].durationMin; o["daysMask"] = scheduleList[i].daysMask; o["repeat"] = scheduleList[i].repeat;
+    o["autoExecution"] = scheduleList[i].autoExecution;
   }
   char payload[2048];
   serializeJson(doc, payload, sizeof(payload));
@@ -289,7 +289,7 @@ void checkSchedules() {
   uint16_t minute = now.hour() * 60 + now.minute();
   uint16_t dayKey = (now.dayOfTheWeek() * 1440) + minute;
   for (uint8_t i = 0; i < scheduleCount; i++) {
-    ScheduleItem &s = schedules[i];
+    ScheduleItem &s = scheduleList[i];
     if (!s.enabled || !s.autoExecution) continue;
     if (s.daysMask && !(s.daysMask & (1 << now.dayOfTheWeek()))) continue;
     uint16_t onMin = minuteOfDay(s.onTime);
