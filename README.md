@@ -1,56 +1,135 @@
-# Smart Farm ESP8266 (Refactored)
+# Smart Farm V7
 
-โปรเจกต์นี้เป็นการพัฒนาโค้ดระบบ Smart Farm ที่ใช้ ESP8266 (NodeMCU V3) เพื่อควบคุมปั๊มน้ำผ่านรีเลย์ โดยเชื่อมต่อกับ MQTT (HiveMQ Cloud) และมีระบบตั้งเวลารดน้ำอัตโนมัติด้วย RTC DS3231 โค้ดได้รับการปรับปรุงให้มีประสิทธิภาพสูงขึ้น มีความเสถียร และรองรับการทำงานแบบมืออาชีพตามเงื่อนไขที่กำหนด
+Smart Farm V7 is a production-oriented ESP8266 smart farm controller for NodeMCU-class boards. It preserves the original RTC + MQTT + dashboard behavior and upgrades the project with four independent active-LOW relay channels, LittleFS JSON storage, schedule automation, sensor telemetry, OTA update support, structured logs, and a redesigned responsive dashboard.
 
-## การแก้ไขและพัฒนาตามเงื่อนไข 20 ข้อ
+## Firmware capabilities
 
-1. **วิเคราะห์โค้ดทั้งหมด**: ตรวจสอบและทำความเข้าใจการทำงานของโค้ดเดิมทั้งหมด
-2. **แก้ Bug ที่พบ**: 
-   - แก้ไขการประกาศตัวแปร String ที่ใช้เครื่องหมายคำพูดผิดรูปแบบ (`“` แทนที่จะเป็น `"`)
-   - แก้ไขการใช้ `sprintf` ให้ปลอดภัยขึ้น
-   - แก้ไขตรรกะการเช็คเวลาที่อาจทำให้ปั๊มเปิด/ปิดซ้ำๆ ใน 1 นาที
-3. **ปรับโครงสร้างโค้ดให้เป็นมืออาชีพ**: จัดกลุ่มตัวแปร, ค่าคงที่, และฟังก์ชันต่างๆ ให้เป็นระเบียบและอ่านง่าย
-4. **แยก Function ให้เป็นระเบียบ**: แยกฟังก์ชันการทำงานเฉพาะเจาะจง เช่น `loadScheduleFromEEPROM`, `setPump`, `connectMQTT`, `checkSchedule`
-5. **เพิ่ม Comment ภาษาไทย**: อธิบายการทำงานของแต่ละส่วนอย่างชัดเจน
-6. **เพิ่มระบบ Watchdog**: เปิดใช้งาน Hardware Watchdog Timer (`ESP.wdtEnable(WDTO_8S)`) เพื่อรีเซ็ตบอร์ดอัตโนมัติหากระบบค้างเกิน 8 วินาที
-7. **เพิ่มระบบ Auto Reconnect WiFi**: WiFiManager มีระบบนี้ในตัว และเพิ่มการตรวจสอบสถานะ WiFi ใน `loop()` เพื่อป้องกันระบบค้างตอนหลุด
-8. **เพิ่มระบบ Auto Reconnect MQTT**: ใช้การตรวจสอบเวลาแบบ Non-blocking ในการพยายามเชื่อมต่อใหม่ทุก 5 วินาที
-9. **เพิ่มระบบ Heartbeat ทุก 30 วินาที**: ส่งข้อความ "ONLINE" ไปยัง topic `farm/status` ทุก 30 วินาที เพื่อยืนยันว่าบอร์ดยังทำงานอยู่
-10. **เพิ่มระบบ Log ผ่าน Serial**: แสดงสถานะการทำงานต่างๆ ผ่าน Serial Monitor อย่างละเอียด
-11. **ป้องกันการเปิดปั๊มซ้ำ**: เพิ่มตัวแปร `pumpState` และตรวจสอบสถานะปัจจุบันก่อนสั่งงานรีเลย์เสมอ
-12. **ทำให้โค้ดไม่ใช้ delay()**: ถอด `delay()` ออกทั้งหมด เปลี่ยนมาใช้การเปรียบเทียบเวลาแทน
-13. **ใช้ millis() ทั้งหมด**: ใช้ `millis()` ในการจัดการเวลาหน่วงของระบบทั้งหมด (Heartbeat, MQTT Reconnect, RTC Update)
-14. **เพิ่มระบบ Manual/Auto Mode**: เพิ่มตัวแปร `isAutoMode` เพื่อให้สามารถเลือกควบคุมเองหรือให้ระบบทำตามตารางเวลาได้
-15. **เพิ่ม MQTT Topic**:
-    - `farm/pump`: รับคำสั่งเปิด/ปิดปั๊ม (เฉพาะตอน Manual Mode)
-    - `farm/status`: ส่งสถานะปั๊ม (ON/OFF) และ Heartbeat (ONLINE)
-    - `farm/time`: ส่งเวลาปัจจุบันจาก RTC ทุก 1 วินาที
-    - `farm/mode`: รับคำสั่งและส่งสถานะโหมด (AUTO/MANUAL)
-    - `farm/schedule`: รับตารางเวลาจาก MQTT
-16. **เพิ่มระบบรับเวลารดน้ำจาก MQTT**: สามารถส่งเวลามาตั้งค่าได้ผ่าน topic `farm/schedule` (รูปแบบ: HH:MM,HH:MM,HH:MM,HH:MM)
-17. **เพิ่มระบบเก็บค่า Schedule ใน EEPROM**: บันทึกตารางเวลาลง EEPROM อัตโนมัติเมื่อมีการตั้งค่าใหม่ และโหลดกลับมาตอนบูตเครื่อง
-18. **รองรับการรีบูตโดยข้อมูลไม่หาย**: ด้วยการใช้ EEPROM ทำให้ตารางเวลาที่ตั้งไว้ยังคงอยู่แม้ไฟดับ
-19. **เพิ่มระบบแจ้ง Offline หาก ESP หลุด**: ใช้ฟีเจอร์ LWT (Last Will and Testament) ของ MQTT โดยกำหนดให้ส่งข้อความ "OFFLINE" ไปยัง `farm/status` หากบอร์ดขาดการเชื่อมต่อ
-20. **อธิบายทุกส่วนของโค้ดที่แก้ไข**: อธิบายรายละเอียดทั้งหมดไว้ในเอกสารนี้และใน Comment ของโค้ด
+- **Four independent relays**
+  - Relay 1: Water Pump
+  - Relay 2: Zone 1 Irrigation
+  - Relay 3: House Light
+  - Relay 4: Pavilion Light
+  - Every relay has its own GPIO, state, MQTT set topic, MQTT state topic, dashboard button, safe boot-off state, active-LOW output, persisted state, and manual override handling.
+- **Reusable relay API**: `setRelay()`, `toggleRelay()`, `publishRelayState()`, `loadRelayState()`, and `saveRelayState()`.
+- **Schedule system**
+  - Schedules are stored in `/schedules.json` on LittleFS.
+  - Each schedule supports enabled/disabled state, relay number, name, ON time, OFF time or duration, selected day mask, repeat, and automatic execution.
+  - The JSON schema supports add, edit, delete, duplicate, sort, search, grouped display, schedule count, and next-execution presentation from the dashboard layer.
+  - The firmware validates corrupted JSON by recreating invalid files and prevents duplicate execution per schedule/minute.
+  - Multiple schedules can run simultaneously on different relays.
+- **Manual/Auto logic**
+  - Default visible mode is Manual.
+  - A relay enters `Scheduled Auto Running` only while a schedule is executing.
+  - Manual commands cancel the current auto task and immediately return that relay to Manual.
+- **MQTT integration**
+  - Base topic: `smartfarm`.
+  - Commands: `smartfarm/relay1/set` ... `smartfarm/relay4/set`.
+  - States: `smartfarm/relay1/state` ... `smartfarm/relay4/state`.
+  - System topics: `smartfarm/status`, `smartfarm/heartbeat`, `smartfarm/sensors`, `smartfarm/schedule`, `smartfarm/schedule/set`, `smartfarm/firmware`, and `smartfarm/telegram/notify`.
+  - Retained state publishing, Last Will (`OFFLINE`), heartbeat, and reconnect are enabled.
+- **OTA**
+  - Browser OTA endpoint is available at `/update` on the ESP8266 web server.
+  - The dashboard exposes OTA status and the firmware reboots after ESP8266 HTTP update success.
+- **Telegram hooks**
+  - Relay changes, schedule start/finish, WiFi/MQTT events, restarts, daily summary, OTA status, and sensor alarms are logged and published to `smartfarm/telegram/notify` for a Telegram bridge/bot service.
+- **RTC and sensors**
+  - DS3231 support with lost-power recovery.
+  - DHT11/DHT22 architecture via `DHT_TYPE`.
+  - Soil moisture, water level, and rain sensor inputs are published to MQTT and dashboard cards.
+- **Storage**
+  - LittleFS stores settings, relay states, schedules, calibration data, and CSV history.
+  - Missing files are recreated automatically.
+- **Stability**
+  - Non-blocking `millis()` scheduling, watchdog feed, WiFi/MQTT reconnect, boot-safe relay output, heap heartbeat, CPU-friendly `yield()`, and no runtime `delay()` calls in the main loop.
 
-## โครงสร้าง Topic MQTT ที่ใช้งาน
+## GPIO map
 
-| Topic | ทิศทาง | รายละเอียด |
-|-------|--------|------------|
-| `farm/pump` | Subscribe | รับคำสั่ง `ON` หรือ `OFF` เพื่อเปิด/ปิดปั๊ม (เฉพาะตอน Manual Mode) |
-| `farm/status` | Publish | ส่งสถานะปั๊ม (`ON`/`OFF`) เมื่อมีการเปลี่ยนแปลง และส่ง `ONLINE` ทุก 30 วินาที (Heartbeat) และ `OFFLINE` เมื่อหลุดการเชื่อมต่อ (LWT) |
-| `farm/time` | Publish | ส่งเวลาปัจจุบันจาก RTC ในรูปแบบ `HH:MM:SS` ทุก 1 วินาที |
-| `farm/mode` | Sub/Pub | รับคำสั่งและส่งสถานะโหมดการทำงาน (`AUTO` หรือ `MANUAL`) |
-| `farm/schedule` | Subscribe | รับตารางเวลาใหม่ในรูปแบบ `HH:MM,HH:MM,HH:MM,HH:MM` (เวลาเปิด1,เวลาปิด1,เวลาเปิด2,เวลาปิด2) |
+| Relay | Function | GPIO constant | NodeMCU pin | Active state |
+|---|---|---|---|---|
+| 1 | Water Pump | `D5` | GPIO14 | LOW |
+| 2 | Zone 1 Irrigation | `D6` | GPIO12 | LOW |
+| 3 | House Light | `D7` | GPIO13 | LOW |
+| 4 | Pavilion Light | `D8` | GPIO15 | LOW |
 
-## วิธีการใช้งาน
+> Note: `D8/GPIO15` must be LOW during boot on many ESP8266 boards. Use a relay board or transistor stage that preserves correct boot strapping.
 
-1. เปิดไฟล์ `Smartfarm_Refactored.ino` ด้วย Arduino IDE
-2. ติดตั้งไลบรารีที่จำเป็น (หากยังไม่มี):
-   - WiFiManager
-   - PubSubClient
-   - RTClib
-3. อัปโหลดโค้ดลงบอร์ด NodeMCU V3
-4. เมื่อบอร์ดทำงานครั้งแรก ให้เชื่อมต่อ WiFi ชื่อ `SmartFarm_Setup` เพื่อตั้งค่าเครือข่าย
-5. ระบบจะเริ่มทำงานตามตารางเวลาที่ตั้งไว้ (ค่าเริ่มต้นคือ 06:00-06:10 และ 17:00-17:10)
-6. สามารถควบคุมผ่าน MQTT Dashboard ได้ตาม Topic ที่กำหนด
+## Dashboard
+
+The updated `index.html` dashboard includes:
+
+- WiFi, MQTT, RTC, Telegram, OTA, current time, uptime, and heap indicators.
+- Temperature, humidity, soil moisture, water level, rain, and chart sections.
+- Four relay cards with ON/OFF, mode, running timer, last action, and manual buttons.
+- Schedule search, count, add, duplicate, enable/disable, delete confirmation, and retained MQTT publishing.
+- Dark mode, light mode, toast notifications, responsive mobile layout, PWA manifest, and offline-capable app shell.
+- Admin/user records in local storage as a dashboard-side convenience. Production deployments should replace this with server-side authentication or ESP-hosted hashed credential checks.
+
+## Required Arduino libraries
+
+Install these libraries in Arduino IDE or PlatformIO:
+
+- ESP8266 board package
+- WiFiManager
+- PubSubClient
+- ArduinoJson
+- RTClib
+- DHT sensor library
+- LittleFS support for ESP8266
+
+## Build and upload
+
+1. Open `Smartfarm_Refactored.ino` in Arduino IDE.
+2. Select an ESP8266 board such as NodeMCU 1.0.
+3. Install the required libraries listed above.
+4. Upload the firmware.
+5. Upload LittleFS data if you add custom JSON files, or let the firmware create defaults at first boot.
+6. Connect to the setup AP `SmartFarmV7_Setup` if WiFi is not configured.
+7. Browse to the ESP8266 IP address for status endpoints and OTA at `/update`.
+8. Serve or open `index.html` for the dashboard and connect it to MQTT over WebSockets.
+
+## MQTT topic reference
+
+| Topic | Direction | Payload |
+|---|---|---|
+| `smartfarm/relay1/set` | Subscribe | `ON`, `OFF`, or `TOGGLE` |
+| `smartfarm/relay1/state` | Publish retained | JSON relay state/mode/timer/last action |
+| `smartfarm/relay2/set` | Subscribe | `ON`, `OFF`, or `TOGGLE` |
+| `smartfarm/relay2/state` | Publish retained | JSON relay state/mode/timer/last action |
+| `smartfarm/relay3/set` | Subscribe | `ON`, `OFF`, or `TOGGLE` |
+| `smartfarm/relay3/state` | Publish retained | JSON relay state/mode/timer/last action |
+| `smartfarm/relay4/set` | Subscribe | `ON`, `OFF`, or `TOGGLE` |
+| `smartfarm/relay4/state` | Publish retained | JSON relay state/mode/timer/last action |
+| `smartfarm/status` | Publish retained | `ONLINE` / `OFFLINE` |
+| `smartfarm/heartbeat` | Publish | JSON uptime, heap, WiFi, RTC, version |
+| `smartfarm/sensors` | Publish retained | JSON sensor telemetry |
+| `smartfarm/schedule` | Publish retained | JSON schedules |
+| `smartfarm/schedule/set` | Subscribe | JSON schedules update |
+| `smartfarm/restart` | Subscribe | Any payload restarts ESP |
+
+## Schedule JSON example
+
+```json
+{
+  "schedules": [
+    {
+      "id": 1001,
+      "enabled": true,
+      "relay": 1,
+      "name": "Morning water",
+      "onTime": "06:00",
+      "offTime": "06:10",
+      "durationMin": 10,
+      "daysMask": 0,
+      "repeat": true,
+      "autoExecution": true
+    }
+  ]
+}
+```
+
+`daysMask` uses bit 0 for Sunday through bit 6 for Saturday. A value of `0` means every day.
+
+## Version
+
+Current project name: **Smart Farm V7**
+Firmware version: **7.0.0**

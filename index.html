@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌱 สวนลุงนะ Smart Farm - Admin V6</title>
+    <title>🌱 สวนลุงนะ Smart Farm V7</title>
     <meta name="theme-color" content="#10b981">
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +161,7 @@
         <div style="text-align: center;">
             <img src="suanlungna_icon_512.png" alt="Smart Farm Logo">
             <h1>สวนลุงนะ</h1>
-            <p>Smart Farm Admin V6</p>
+            <p>Smart Farm V7</p>
             <div class="spinner"></div>
         </div>
     </div>
@@ -202,7 +202,7 @@
                     </div>
                     <div class="status-box">
                         <div class="label">ปั๊มน้ำ</div>
-                        <div class="value" id="pumpStatus">OFF</div>
+                        <div class="value" id="pumpOverviewStatus">OFF</div>
                     </div>
                     <div class="status-box">
                         <div class="label">โหมด</div>
@@ -212,6 +212,27 @@
                         <div class="label">เวลา</div>
                         <div class="value" id="rtcTime">--:--</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- SMART FARM V7 RELAY DASHBOARD -->
+            <div class="card">
+                <div class="section-title"><i class="fas fa-plug"></i> Smart Farm V7 Relay Status</div>
+                <div class="status-grid" id="relayGrid">
+                    <div class="status-box"><div class="label">Water Pump</div><div class="value" id="relay1Status">OFF</div><small id="relay1Mode">Manual</small><br><small id="relay1Timer">Timer: 0s</small><br><small id="relay1Last">Last: boot</small><button class="btn btn-primary" onclick="toggleRelay(1)">Pump</button></div>
+                    <div class="status-box"><div class="label">Zone 1 Irrigation</div><div class="value" id="relay2Status">OFF</div><small id="relay2Mode">Manual</small><br><small id="relay2Timer">Timer: 0s</small><br><small id="relay2Last">Last: boot</small><button class="btn btn-primary" onclick="toggleRelay(2)">Zone 1</button></div>
+                    <div class="status-box"><div class="label">House Light</div><div class="value" id="relay3Status">OFF</div><small id="relay3Mode">Manual</small><br><small id="relay3Timer">Timer: 0s</small><br><small id="relay3Last">Last: boot</small><button class="btn btn-primary" onclick="toggleRelay(3)">House Light</button></div>
+                    <div class="status-box"><div class="label">Pavilion Light</div><div class="value" id="relay4Status">OFF</div><small id="relay4Mode">Manual</small><br><small id="relay4Timer">Timer: 0s</small><br><small id="relay4Last">Last: boot</small><button class="btn btn-primary" onclick="toggleRelay(4)">Pavilion Light</button></div>
+                </div>
+                <div class="status-grid">
+                    <div class="status-box"><div class="label">WiFi</div><div class="value" id="wifiStatus">--</div></div>
+                    <div class="status-box"><div class="label">MQTT</div><div class="value" id="mqttStatus">--</div></div>
+                    <div class="status-box"><div class="label">RTC</div><div class="value" id="rtcStatus">--</div></div>
+                    <div class="status-box"><div class="label">Telegram</div><div class="value" id="telegramStatus">READY</div></div>
+                    <div class="status-box"><div class="label">OTA</div><div class="value" id="otaStatus">READY</div></div>
+                    <div class="status-box"><div class="label">Uptime</div><div class="value" id="uptimeStatus">--</div></div>
+                    <div class="status-box"><div class="label">Heap</div><div class="value" id="heapStatus">--</div></div>
+                    <div class="status-box"><div class="label">Next Schedule</div><div class="value" id="nextSchedule">--</div></div>
                 </div>
             </div>
 
@@ -251,6 +272,8 @@
             <!-- SCHEDULE -->
             <div class="card">
                 <div class="section-title"><i class="fas fa-calendar-alt"></i> ตารางเวลา</div>
+                <input class="input-control" id="scheduleSearch" placeholder="ค้นหาตารางเวลา" oninput="renderSchedules()">
+                <div id="scheduleCount">0 schedules</div>
                 <div id="scheduleList"></div>
                 <button class="btn btn-primary" onclick="showScheduleEditor()"><i class="fas fa-plus"></i> เพิ่มตารางเวลา</button>
             </div>
@@ -484,17 +507,22 @@
                 document.getElementById('nodeStatus').style.color = '#10b981';
                 addLog('เชื่อมต่อ MQTT สำเร็จ');
                 
-                mqttClient.subscribe(['farm/pump/status', 'farm/time', 'farm/soil', 'farm/light', 'farm/status', 'farm/mode', 'farm/temp', 'farm/hum']);
+                mqttClient.subscribe(['smartfarm/status','smartfarm/heartbeat','smartfarm/sensors','smartfarm/schedule','smartfarm/relay1/state','smartfarm/relay2/state','smartfarm/relay3/state','smartfarm/relay4/state','farm/time','farm/status','farm/mode','farm/temp','farm/hum']);
             });
 
             mqttClient.on('message', (topic, message) => {
                 const msg = message.toString();
                 console.log(`${topic}: ${msg}`);
                 
+                if (topic.startsWith('smartfarm/relay') && topic.endsWith('/state')) { updateRelayCard(Number(topic.match(/relay(\d+)/)[1]), msg); return; }
+                if (topic === 'smartfarm/status') { document.getElementById('mqttStatus').textContent = msg; document.getElementById('nodeStatus').textContent = msg; return; }
+                if (topic === 'smartfarm/heartbeat') { try { const h = JSON.parse(msg); heapStatus.textContent = h.heap; uptimeStatus.textContent = h.uptime + 's'; rtcStatus.textContent = h.rtc ? 'OK' : 'FAIL'; wifiStatus.textContent = h.wifi ? 'OK' : 'FAIL'; } catch(e) {} return; }
+                if (topic === 'smartfarm/sensors') { try { const v = JSON.parse(msg); temp.textContent = v.temperature + '°C'; hum.textContent = v.humidity + '%'; soil.textContent = v.soil; } catch(e) {} return; }
+                if (topic === 'smartfarm/schedule') { try { schedules = JSON.parse(msg).schedules || []; renderSchedules(); } catch(e) {} return; }
                 switch(topic) {
                     case 'farm/pump/status':
-                        document.getElementById('pumpStatus').textContent = msg === 'ON' ? 'ON' : 'OFF';
-                        document.getElementById('pumpStatus').style.color = msg === 'ON' ? '#ef4444' : '#10b981';
+                        document.getElementById('relay1Status').textContent = msg === 'ON' ? 'ON' : 'OFF';
+                        document.getElementById('relay1Status').style.color = msg === 'ON' ? '#ef4444' : '#10b981';
                         addLog(`ปั๊มน้ำ: ${msg}`);
                         break;
                     case 'farm/time':
@@ -536,9 +564,9 @@
         // ==================== PUMP CONTROL ====================
         function togglePump() {
             if (mqttClient && mqttClient.connected) {
-                const currentStatus = document.getElementById('pumpStatus').textContent;
+                const currentStatus = document.getElementById('relay1Status').textContent;
                 const newStatus = currentStatus === 'ON' ? 'OFF' : 'ON';
-                mqttClient.publish('farm/pump', newStatus);
+                mqttClient.publish('smartfarm/relay1/set', newStatus, { retain: true });
                 addLog(`สั่งปั๊มน้ำ: ${newStatus}`);
                 showToast(`ปั๊มน้ำ: ${newStatus}`);
             } else {
@@ -655,6 +683,65 @@
             `).join('');
         }
 
+
+        // ==================== SMART FARM V7 RELAYS & SCHEDULES ====================
+        const relayNames = ['Water Pump', 'Zone 1 Irrigation', 'House Light', 'Pavilion Light'];
+        let relayStates = [false, false, false, false];
+        let schedules = JSON.parse(localStorage.getItem('smartfarm_v7_schedules')) || [];
+
+        function topicForRelay(relay, suffix) { return `smartfarm/relay${relay}/${suffix}`; }
+
+        function toggleRelay(relay) {
+            const next = relayStates[relay - 1] ? 'OFF' : 'ON';
+            if (mqttClient && mqttClient.connected) {
+                mqttClient.publish(topicForRelay(relay, 'set'), next, { retain: true });
+                addLog(`${relayNames[relay - 1]}: ${next}`);
+                showToast(`${relayNames[relay - 1]} ${next}`);
+            } else { showToast('ไม่ได้เชื่อมต่อ MQTT'); }
+        }
+
+        function updateRelayCard(relay, payload) {
+            let data = {};
+            try { data = JSON.parse(payload); } catch (e) { data = { state: payload }; }
+            const state = data.state === 'ON';
+            relayStates[relay - 1] = state;
+            document.getElementById(`relay${relay}Status`).textContent = state ? 'ON' : 'OFF';
+            document.getElementById(`relay${relay}Status`).style.color = state ? '#ef4444' : '#10b981';
+            document.getElementById(`relay${relay}Mode`).textContent = data.mode || 'Manual';
+            document.getElementById(`relay${relay}Timer`).textContent = `Timer: ${data.timer || 0}s`;
+            document.getElementById(`relay${relay}Last`).textContent = `Last: ${data.lastAction || '-'}`;
+        }
+
+        function renderSchedules() {
+            const q = (document.getElementById('scheduleSearch')?.value || '').toLowerCase();
+            const filtered = schedules.filter(s => !q || `${s.name} ${relayNames[(s.relay || 1) - 1]}`.toLowerCase().includes(q));
+            document.getElementById('scheduleCount').textContent = `${filtered.length} schedules`;
+            document.getElementById('scheduleList').innerHTML = filtered.map((s, i) => `
+                <div class="status-box" style="text-align:left;margin-bottom:12px">
+                    <strong>${s.name || 'Schedule'}</strong> - ${relayNames[(s.relay || 1) - 1]}<br>
+                    <small>${s.enabled ? 'Enabled' : 'Disabled'} | ${s.onTime || '--:--'} → ${s.offTime || (s.durationMin || 10) + ' min'} | ${s.repeat ? 'Repeat' : 'Once'}</small>
+                    <div style="display:flex;gap:8px;margin-top:8px">
+                        <button class="btn btn-outline" onclick="duplicateSchedule(${i})">Duplicate</button>
+                        <button class="btn btn-outline" onclick="toggleSchedule(${i})">${s.enabled ? 'Disable' : 'Enable'}</button>
+                        <button class="btn btn-danger" onclick="deleteSchedule(${i})">Delete</button>
+                    </div>
+                </div>`).join('');
+            localStorage.setItem('smartfarm_v7_schedules', JSON.stringify(schedules));
+        }
+
+        function showScheduleEditor() {
+            const name = prompt('Schedule name:'); if (!name) return;
+            const relay = Number(prompt('Relay number (1-4):', '1')) || 1;
+            const onTime = prompt('ON time (HH:MM):', '06:00') || '06:00';
+            const durationMin = Number(prompt('Duration minutes:', '10')) || 10;
+            schedules.push({ id: Date.now(), enabled: true, relay, name, onTime, durationMin, daysMask: 0, repeat: true, autoExecution: true });
+            publishSchedules(); renderSchedules(); showToast('บันทึกตารางเวลาแล้ว');
+        }
+        function duplicateSchedule(i) { schedules.push({ ...schedules[i], id: Date.now(), name: schedules[i].name + ' copy' }); publishSchedules(); renderSchedules(); }
+        function toggleSchedule(i) { schedules[i].enabled = !schedules[i].enabled; publishSchedules(); renderSchedules(); }
+        function deleteSchedule(i) { if (confirm('Delete this schedule?')) { schedules.splice(i, 1); publishSchedules(); renderSchedules(); } }
+        function publishSchedules() { if (mqttClient && mqttClient.connected) mqttClient.publish('smartfarm/schedule/set', JSON.stringify({ schedules }), { retain: true }); }
+
         // ==================== UTILITIES ====================
         function showToast(msg) {
             const toast = document.createElement('div');
@@ -680,6 +767,11 @@
             
             renderUserList();
             renderLogs();
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('service-worker.js').catch(err => addLog('Service worker: ' + err.message));
+            }
+
+            renderSchedules();
             addLog('ระบบเริ่มต้นสำเร็จ');
         });
 
