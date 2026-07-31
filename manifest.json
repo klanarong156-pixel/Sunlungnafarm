@@ -1,14 +1,17 @@
 {
-  "name": "สวนลุงนะ Smart Farm - Admin V4",
-  "short_name": "Smart Farm",
-  "description": "ระบบจัดการฟาร์มอัจฉริยะด้วย ESP8266 และ MQTT",
+  "name": "Smart Farm V7",
+  "short_name": "Smart Farm V7",
+  "description": "Production-ready ESP8266 Smart Farm V7 dashboard with relays, schedules, MQTT, OTA, Telegram hooks, RTC, sensors, and offline support.",
   "start_url": "/index.html",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "theme_color": "#10b981",
   "background_color": "#f0fdf4",
-  "categories": ["agriculture", "productivity"],
+  "categories": [
+    "agriculture",
+    "productivity"
+  ],
   "screenshots": [
     {
       "src": "suanlungna_icon_512.png",
